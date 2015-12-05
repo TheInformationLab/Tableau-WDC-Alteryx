@@ -29,6 +29,7 @@
 
 	var myInterval = 0;
 	var checkWorkflowID = 0;
+	var workflowName = "";
 
 	function checkWorkflowStatus() {
 		console.log("Checking Workflow Status");
@@ -40,27 +41,29 @@
 				var outputs = response.outputs;
 				for (var i = 0; i < outputs.length; i++) {
 					var outputName = outputs[i].name;
-					if (outputName.search("headers.json") > 0) {
+					if (outputName.search("headers.json") > -1) {
 						var headersID = outputs[i].id;
-					} else if (outputName.search("data.json") > 0) {
+					} else if (outputName.search("data.json") > -1) {
 						var dataID = outputs[i].id;
 					}
 				}
-				var headerURL = gallery.getOutputFileURL(checkWorkflowID, headersID, "json");
-				var dataURL = gallery.getOutputFileURL(checkWorkflowID, dataID, "json");
-				var connData = JSON.parse(tableau.connectionData);
-				connData.headerURL = headerURL;
-				connData.dataURL = dataURL;
-				tableau.connectionData = JSON.stringify(connData);
-				tableau.initCallback();
+				if (headersID && dataID) {
+					var headerURL = gallery.getOutputFileURL(checkWorkflowID, headersID, "json");
+					var dataURL = gallery.getOutputFileURL(checkWorkflowID, dataID, "json");
+					var connData = JSON.parse(tableau.connectionData);
+					connData.headerURL = headerURL;
+					connData.dataURL = dataURL;
+					tableau.connectionData = JSON.stringify(connData);
+					tableau.initCallback();
+				} else {
+					tableau.abortWithError("No valid outputs found. Check data.json and headers.json are present");
+				}
 			}
 		}, function (errorResponse) {
 			console.log(errorResponse);
 			if(myInterval > 0) clearInterval(myInterval);
 		});
 	}
-
-	(function(){
 
 	var myConnector = tableau.makeConnector();
 
@@ -110,6 +113,7 @@
 				type: 'GET',
 				url: connData.dataURL,
 				success: function(data) {
+					console.log(data);
 					var outputData = JSON.parse(data);
 					tableau.dataCallback(outputData, outputData.length.toString(), false);
 				},
@@ -190,6 +194,7 @@
 				connData.questions = responseArray;
 				connData.workflowID = workflowID;
 				tableau.connectionData = JSON.stringify(connData);
+				tableau.connectionName = workflowName;
 				console.log("Executing Tableau Submit");
 				tableau.submit();
 			});
@@ -203,6 +208,12 @@
 			//$('.welcome').hide();
 			$('#getworkflows').bind('click', function(){
 				var galleryURL = $('#galleryURL').val().trim();
+				console.log("URL " +galleryURL);
+				if (galleryURL.substring(galleryURL.length - 1, galleryURL.length)=="/") {
+					galleryURL = galleryURL.substring(0, galleryURL.length -1);
+				}
+				galleryURL = galleryURL + '/api/v1';
+				console.log(galleryURL);
 				var galleryKey = $('#apiKey').val().trim();
 				var gallerySecret = $('#apiSecret').val().trim();
 				var connData = {};
@@ -218,15 +229,20 @@
 						$('.credentials').html("<h4>Select a Workflow</h4>")
 						var workflowSelect = document.createElement('select');
 						for (var i = 0; i < workflows.length; i++) {
-							var workflowItem = document.createElement('option');
-							workflowItem.text = workflows[i].metaInfo.name;
-							workflowItem.value = workflows[i].id;
-							workflowSelect.add(workflowItem);
+							var filename = workflows[i].fileName;
+							if (filename.search(".yxwz") > 0) {
+								var workflowItem = document.createElement('option');
+								workflowItem.text = workflows[i].metaInfo.name;
+								workflowItem.value = workflows[i].id;
+								workflowSelect.add(workflowItem);
+							}
 						}
 						$('.credentials').append(workflowSelect);
 						workflowSelect.addEventListener('change', function() {
 							var x = this.selectedIndex;
 							var workflowID = this[x].value;
+							workflowName = this[x].text;
+							console.log(workflowName);
 							buildInterface(workflowID);
 						});
 						buildInterface(workflows[0].id);
@@ -235,7 +251,6 @@
         });
 			});
 	});
-	})();
 	</script>
 </head>
 <body class="yay-hide">
@@ -262,19 +277,22 @@
 						<a href="alteryx.html"><i class="icon-alteryx" style="font-size:22px"></i>Alteryx Gallery</a>
 					</li>
 					<li>
+						<a href="parsehub.html"><i class="icon-parsehub" style="font-size:22px"></i>ParseHub</a>
+					</li>
+					<li>
+						<a href="quandl.html"><i class="icon-quandl" style="font-size:22px"></i>Quandl</a>
+					</li>
+					<li>
             <a href="fitbit.html"><i class="icon-fitbit" style="font-size:22px"></i>Fitbit</a>
           </li>
 					<li>
 						<a href="strava.html"><i class="icon-strava" style="font-size:22px"></i>Strava</a>
 					</li>
 					<li>
+						<a href="runkeeper.html"><i class="icon-Runkeeper" style="font-size:22px"></i>Runkeeper</a>
+					</li>
+					<li>
 						<a href="moves.html"><i class="icon-Moves" style="font-size:22px"></i>Moves</a>
-					</li>
-					<li>
-						<a href="quandl.html"><i class="icon-quandl" style="font-size:22px"></i>Quandl</a>
-					</li>
-					<li>
-						<a href="parsehub.html"><i class="icon-parsehub" style="font-size:22px"></i>ParseHub</a>
 					</li>
 					<li>
 						<a href="directions.html"><i class="icon-Mapbox" style="font-size:22px"></i>Mapbox Directions</a>
@@ -294,26 +312,26 @@
  				<p class="centre"> <img src="images/alteryx.png" alt="alteryx" style="width:450px;height:100px;"> </p>
 				<div class="credentials centre">
 				<div class="group">
-					<input class="inputMaterial" type="text"  id="galleryURL" value='http://windows-10/alteryx/api/v1'>
+					<input class="inputMaterial" type="text"  id="galleryURL" value=''>
 					<span class="highlight"></span>
 					<span class="bar"></span>
 					<label>Gallery URL</label>
 				</div>
 				<div class="group">
-					<input class="inputMaterial" type="text"  id="apiKey" value='8D2CFBD1B6A8F425f3c62521786e0efd7ec19b1324dd6bc41f24b57'>
+					<input class="inputMaterial" type="text"  id="apiKey" value=''>
 					<span class="highlight"></span>
 					<span class="bar"></span>
 					<label>API Key</label>
 				</div>
 				<div class="group">
-					<input class="inputMaterial" type="text"  id="apiSecret" value='d6b7f6212a53a8797dde22c9636ffdfc314486f99e48dcfe601a9b0504ec4adc'>
+					<input class="inputMaterial" type="text"  id="apiSecret" value=''>
 					<span class="highlight"></span>
 					<span class="bar"></span>
 					<label>API Secret</label>
 				</div>
 			</div>
 			<div class="questionTableDiv centre"></div>
-				<p class="section-description centre instructions">Don't know your key?<br/>Browse to http://spider.theinformationlab.co.uk/alteryxcloud/#!account/settings/studio</p>
+				<p class="section-description centre instructions">Don't know your key?<br/>Browse to http://[Gallery URL]/#!account/settings/studio</p>
 				<p class="section-description centre"><a class='button button-primary button-margin' id='getworkflows'>Get Workflows!</a></p>
  				<p class="section-logo centre"><a href="http://www.theinformationlab.co.uk"><img src="images/logo.png" alt="The Information Lab" style="width:188px;height:75px;"></a></p>
  		 </div>

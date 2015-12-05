@@ -1,8 +1,6 @@
 (function() {
 
     var versionNumber = "1.1.0";
-    var _sourceWindow;
-
     if (typeof tableauVersionBootstrap === 'undefined') {
         // tableau version bootstrap isn't defined. We are likely running in the simulator so init up our tableau object
         tableau = {
@@ -10,6 +8,7 @@
             connectionData: "",
             password: "",
             username: "",
+            interactive: true,
             incrementalExtractColumn: "",
 
             initCallback: function () {
@@ -52,16 +51,6 @@
 
     tableau.versionNumber = versionNumber;
 
-    tableau.phaseEnum = {
-        interactivePhase: "interactive", 
-        authPhase: "auth",
-        gatherDataPhase: "gatherData"
-    };
-
-    if (!tableau.phase) {
-        tableau.phase = tableau.phaseEnum.interactivePhase;
-    }
-
     // Assign the functions we always want to have available on the tableau object
     tableau.makeConnector = function() {
         var defaultImpls = {
@@ -84,18 +73,8 @@
 
     function _sendMessage(msgName, msgData) {
         var messagePayload = _buildMessagePayload(msgName, msgData);
-        
-        // Check first to see if we have a messageHandler defined to post the message to
-        if (typeof window.webkit != 'undefined' &&
-            typeof window.webkit.messageHandlers != 'undefined' &&
-            typeof window.webkit.messageHandlers.wdcHandler != 'undefined') {
-            
-            window.webkit.messageHandlers.wdcHandler.postMessage(messagePayload);
-        } else if (!_sourceWindow) {
-            throw "Looks like the WDC is calling a tableau function before tableau.init() has been called."
-        } else {
-            _sourceWindow.postMessage(messagePayload, "*");
-        }
+
+        window.parent.postMessage(messagePayload, "*");
     }
 
     function _buildMessagePayload(msgName, msgData) {
@@ -110,8 +89,7 @@
                           "connectionData": tableau.connectionData,
                           "password": tableau.password,
                           "username": tableau.username,
-                          "incrementalExtractColumn": tableau.incrementalExtractColumn,
-                          "versionNumber": tableau.versionNumber};
+                          "incrementalExtractColumn": tableau.incrementalExtractColumn};
         return propValues;
     }
 
@@ -125,21 +103,18 @@
         }
     }
 
-    function _receiveMessage(evnt) {
-        var wdc = window._wdc;
-        if (!wdc) {
+    function _receiveMessage(event) {
+        if (!_wdc) {
             throw "No WDC registered. Did you forget to call tableau.registerConnector?";
         }
-        if (!_sourceWindow) {
-            _sourceWindow = evnt.source
-        }
-        var payloadObj = JSON.parse(evnt.data);
+        var wdc = _wdc;
+        var payloadObj = JSON.parse(event.data);
         var msgData = payloadObj.msgData;
         _applyPropertyValues(payloadObj.props);
 
         switch(payloadObj.msgName) {
             case "init":
-                tableau.phase = msgData.phase;
+                tableau.interactive = msgData.interactive;
                 wdc.init();
             break;
             case "shutdown":
@@ -153,29 +128,6 @@
             break;
         }
     };
-
-    // Add global error handler. If there is a javascript error, this will report it to Tableau
-    // so that it can be reported to the user.
-    window.onerror = function (message, file, line, column, errorObj) {
-        if (tableau._hasAlreadyThrownErrorSoDontThrowAgain) {
-            return true;
-        }
-        var msg = message;
-        if(errorObj) {
-            msg += "   stack:" + errorObj.stack;
-        } else {
-            msg += "   file: " + file;
-            msg += "   line: " + line;
-        }
-
-        if (tableau && tableau.abortWithError) {
-            tableau.abortWithError(msg);
-        } else {
-            throw msg;
-        }
-        tableau._hasAlreadyThrownErrorSoDontThrowAgain = true;
-        return true;
-    }
 
     window.addEventListener('message', _receiveMessage, false);
 })();

@@ -37,15 +37,12 @@ Gallery = function(apiLocation, apiKey, apiSecret) {
     this.executeWorkflow = function(id, questions, success, error){
         var type = "POST",
             url = this.apiLocation + "/workflows/" + id + "/jobs/",
-            params = buildOauthParamsPost(this.apiKey);
-        console.log(params);
+            params = buildOauthParams(this.apiKey);
         var signature = generateSignature(type, url, params, this.apiSecret);
         $.extend(params, {oauth_signature: signature});
         $.ajax({
             type: type,
             url: url + "?" + $.param(params),
-            dataType: 'jsonp',
-            jsonp: false,
             data: JSON.stringify({questions: questions}),
             success: success,
             error: error,
@@ -91,17 +88,6 @@ Gallery = function(apiLocation, apiKey, apiSecret) {
         var signature = generateSignature(type, url, params, this.apiSecret);
         $.extend(params, {oauth_signature: signature});
         return url + "?" + $.param(params);
-    };
-
-    var buildOauthParamsPost = function(apiKey){
-        return {
-            oauth_callback: "alteryxCallback",
-            oauth_consumer_key: apiKey,
-            oauth_signature_method: "HMAC-SHA1",
-            oauth_nonce: Math.floor(Math.random() * 1e9).toString(),
-            oauth_timestamp: Math.floor(new Date().getTime()/1000).toString(),
-            oauth_version: "1.0"
-        };
     };
 
     var buildOauthParams = function(apiKey){
